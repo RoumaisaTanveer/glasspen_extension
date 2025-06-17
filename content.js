@@ -1,7 +1,6 @@
 document.addEventListener('glasspen-activate', () => {
   if (document.getElementById('glasspen-canvas')) return;
 
-  // Create full-page canvas
   const canvas = document.createElement('canvas');
   canvas.id = 'glasspen-canvas';
   canvas.style.position = 'absolute';
@@ -10,8 +9,8 @@ document.addEventListener('glasspen-activate', () => {
   canvas.style.width = `${document.documentElement.scrollWidth}px`;
   canvas.style.height = `${document.documentElement.scrollHeight}px`;
   canvas.style.zIndex = '999999';
- canvas.style.pointerEvents = 'auto';
- // let mouse events pass through
+  canvas.style.pointerEvents = 'auto';
+  canvas.style.cursor = 'crosshair';
   document.body.appendChild(canvas);
 
   const ctx = canvas.getContext('2d');
@@ -21,30 +20,55 @@ document.addEventListener('glasspen-activate', () => {
   ctx.lineWidth = 2;
 
   let drawing = false;
+  let currentPath = [];
+  const paths = [];
 
   const startDrawing = (e) => {
     drawing = true;
-    canvas.style.pointerEvents = 'auto';
+    currentPath = [{ x: e.pageX, y: e.pageY }];
     ctx.beginPath();
     ctx.moveTo(e.pageX, e.pageY);
   };
 
   const draw = (e) => {
     if (!drawing) return;
-    ctx.lineTo(e.pageX, e.pageY);
+    const x = e.pageX;
+    const y = e.pageY;
+    currentPath.push({ x, y });
+    ctx.lineTo(x, y);
     ctx.stroke();
   };
 
   const stopDrawing = () => {
+    if (drawing) {
+      paths.push(currentPath);
+    }
     drawing = false;
   };
 
-  // Use page events so it tracks actual document
-  document.addEventListener('mousedown', startDrawing);
-  document.addEventListener('mousemove', draw);
-  document.addEventListener('mouseup', stopDrawing);
+  const redrawAll = () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (const path of paths) {
+      ctx.beginPath();
+      for (let i = 0; i < path.length; i++) {
+        const point = path[i];
+        if (i === 0) {
+          ctx.moveTo(point.x, point.y);
+        } else {
+          ctx.lineTo(point.x, point.y);
+        }
+      }
+      ctx.stroke();
+    }
+  };
 
-  // STOP BUTTON
+  // Event listeners
+  canvas.addEventListener('mousedown', startDrawing);
+  canvas.addEventListener('mousemove', draw);
+  canvas.addEventListener('mouseup', stopDrawing);
+  canvas.addEventListener('mouseleave', stopDrawing);
+
+  // Stop Button
   const stopBtn = document.createElement('button');
   stopBtn.textContent = '❌ Stop Drawing';
   Object.assign(stopBtn.style, {
@@ -64,17 +88,18 @@ document.addEventListener('glasspen-activate', () => {
   stopBtn.onclick = () => {
     canvas.remove();
     stopBtn.remove();
-    clearBtn.remove();
-    document.removeEventListener('mousedown', startDrawing);
-    document.removeEventListener('mousemove', draw);
-    document.removeEventListener('mouseup', stopDrawing);
+    undoBtn.remove();
+    canvas.removeEventListener('mousedown', startDrawing);
+    canvas.removeEventListener('mousemove', draw);
+    canvas.removeEventListener('mouseup', stopDrawing);
+    canvas.removeEventListener('mouseleave', stopDrawing);
   };
   document.body.appendChild(stopBtn);
 
-  // CLEAR BUTTON
-  const clearBtn = document.createElement('button');
-  clearBtn.textContent = '🧹 Clear Drawing';
-  Object.assign(clearBtn.style, {
+  // Undo Button
+  const undoBtn = document.createElement('button');
+  undoBtn.textContent = '↩️ Undo';
+  Object.assign(undoBtn.style, {
     position: 'fixed',
     top: '60px',
     right: '20px',
@@ -88,8 +113,9 @@ document.addEventListener('glasspen-activate', () => {
     cursor: 'pointer',
     boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
   });
-  clearBtn.onclick = () => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  undoBtn.onclick = () => {
+    paths.pop(); // remove last stroke
+    redrawAll();
   };
-  document.body.appendChild(clearBtn);
+  document.body.appendChild(undoBtn);
 });
