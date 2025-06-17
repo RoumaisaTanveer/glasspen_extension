@@ -1,7 +1,125 @@
 document.addEventListener('glasspen-activate', () => {
   if (document.getElementById('glasspen-canvas')) return;
 
-  // Create full-page canvas
+  const STORAGE_KEY = 'glasspen_paths';
+  const NOTES_KEY = 'glasspen_notes';
+
+  function savePaths() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(paths));
+  }
+
+  function loadPaths() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  }
+
+  function clearSavedPaths() {
+    localStorage.removeItem(STORAGE_KEY);
+  }
+
+  function saveNotes() {
+    const notes = [...document.querySelectorAll('.glasspen-note')].map(note => ({
+      text: note.querySelector('textarea').value,
+      top: note.style.top,
+      left: note.style.left,
+      color: note.style.backgroundColor
+    }));
+    localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
+  }
+
+  function loadNotes() {
+    const saved = localStorage.getItem(NOTES_KEY);
+    if (!saved) return;
+    try {
+      const notes = JSON.parse(saved);
+      for (const note of notes) createStickyNote(note.top, note.left, note.text, note.color);
+    } catch {}
+  }
+
+  function createStickyNote(top = '300px', left = '300px', text = '', color = noteColorPicker?.value || '#ffff88') {
+    const note = document.createElement('div');
+    note.className = 'glasspen-note';
+    Object.assign(note.style, {
+      position: 'fixed',
+      top,
+      left,
+      width: '200px',
+      height: '150px',
+      backgroundColor: color,
+      border: '1px solid #000',
+      padding: '5px',
+      zIndex: '1000002',
+      resize: 'both',
+      overflow: 'auto',
+      boxShadow: '2px 2px 6px rgba(0,0,0,0.2)'
+    });
+    note.style.cursor = 'grab';
+    let offsetX, offsetY;
+    let dragging = false;
+
+    note.addEventListener('mousedown', function (e) {
+      if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON') return;
+      dragging = true;
+      note.style.cursor = 'grabbing';
+      offsetX = e.clientX - note.offsetLeft;
+      offsetY = e.clientY - note.offsetTop;
+
+      function move(e) {
+        if (!dragging) return;
+        note.style.left = e.clientX - offsetX + 'px';
+        note.style.top = e.clientY - offsetY + 'px';
+      }
+
+      function stopMove() {
+        dragging = false;
+         note.style.cursor = 'grab'; 
+        document.removeEventListener('mousemove', move);
+        document.removeEventListener('mouseup', stopMove);
+        saveNotes();
+      }
+
+      document.addEventListener('mousemove', move);
+      document.addEventListener('mouseup', stopMove);
+    });
+
+    const textarea = document.createElement('textarea');
+    textarea.style.width = '100%';
+    textarea.style.height = 'calc(100% - 25px)';
+    textarea.style.border = 'none';
+    textarea.style.outline = 'none';
+    textarea.style.background = 'transparent';
+    textarea.style.resize = 'none';
+    textarea.value = text;
+    textarea.oninput = saveNotes;
+
+    const delBtn = document.createElement('button');
+    delBtn.textContent = '×';
+    Object.assign(delBtn.style, {
+      position: 'absolute',
+      top: '2px',
+      right: '4px',
+      background: 'transparent',
+      border: 'none',
+      fontSize: '16px',
+      cursor: 'pointer'
+    });
+    delBtn.onclick = () => {
+      note.remove();
+      saveNotes();
+    };
+
+    note.appendChild(delBtn);
+    note.appendChild(textarea);
+    document.body.appendChild(note);
+  }
+
   const canvas = document.createElement('canvas');
   canvas.id = 'glasspen-canvas';
   canvas.style.position = 'absolute';
@@ -22,8 +140,8 @@ document.addEventListener('glasspen-activate', () => {
 
   let drawing = false;
   let currentPath = [];
-  const paths = [];
   let isEraser = false;
+  let paths = loadPaths();
 
   function redraw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -41,6 +159,7 @@ document.addEventListener('glasspen-activate', () => {
       }
       ctx.stroke();
     }
+    savePaths();
   }
 
   function eraseAt(x, y) {
@@ -89,17 +208,16 @@ document.addEventListener('glasspen-activate', () => {
         width: parseInt(thicknessPicker.value),
         points: currentPath
       });
+      savePaths();
     }
     drawing = false;
   }
 
-  // Mouse
   canvas.addEventListener('mousedown', e => start(e.pageX, e.pageY));
   canvas.addEventListener('mousemove', e => draw(e.pageX, e.pageY));
   canvas.addEventListener('mouseup', stop);
   canvas.addEventListener('mouseleave', stop);
 
-  // Touch
   canvas.addEventListener('touchstart', e => {
     const touch = e.touches[0];
     start(touch.pageX, touch.pageY);
@@ -110,7 +228,14 @@ document.addEventListener('glasspen-activate', () => {
   });
   canvas.addEventListener('touchend', stop);
 
-  // Buttons
+  window.addEventListener('resize', () => {
+    canvas.width = document.documentElement.scrollWidth;
+    canvas.height = document.documentElement.scrollHeight;
+    canvas.style.width = `${document.documentElement.scrollWidth}px`;
+    canvas.style.height = `${document.documentElement.scrollHeight}px`;
+    redraw();
+  });
+
   function makeButton(text, top, action) {
     const btn = document.createElement('button');
     btn.textContent = text;
@@ -132,7 +257,8 @@ document.addEventListener('glasspen-activate', () => {
   }
 
   const stopBtn = makeButton('❌ Stop', 20, () => {
-    [canvas, stopBtn, undoBtn, eraserBtn, colorPicker, thicknessPicker].forEach(el => el.remove());
+    [canvas, stopBtn, undoBtn, eraserBtn, colorPicker, thicknessPicker, clearBtn, noteBtn, noteColorPicker].forEach(el => el.remove());
+    document.querySelectorAll('.glasspen-note').forEach(n => n.remove());
   });
 
   const undoBtn = makeButton('↩️ Undo', 60, () => {
@@ -145,6 +271,17 @@ document.addEventListener('glasspen-activate', () => {
     eraserBtn.textContent = isEraser ? '✏️ Eraser: On' : '🧽 Eraser: Off';
   });
 
+  const clearBtn = makeButton('🗑️ Clear All', 140, () => {
+    paths.length = 0;
+    clearSavedPaths();
+    redraw();
+  });
+
+  const noteBtn = makeButton('📝 Add Note', 180, () => {
+    createStickyNote();
+    saveNotes();
+  });
+
   const colorPicker = document.createElement('select');
   ['red', 'blue', 'green', 'black'].forEach(color => {
     const option = document.createElement('option');
@@ -155,7 +292,7 @@ document.addEventListener('glasspen-activate', () => {
   colorPicker.value = 'red';
   Object.assign(colorPicker.style, {
     position: 'fixed',
-    top: '140px',
+    top: '220px',
     right: '20px',
     zIndex: '1000001',
     padding: '4px'
@@ -172,10 +309,29 @@ document.addEventListener('glasspen-activate', () => {
   thicknessPicker.value = 2;
   Object.assign(thicknessPicker.style, {
     position: 'fixed',
-    top: '180px',
+    top: '260px',
     right: '20px',
     zIndex: '1000001',
     padding: '4px'
   });
   document.body.appendChild(thicknessPicker);
+
+  const noteColorPicker = document.createElement('select');
+  [['#ffff88', 'Yellow'], ['#ffc0cb', 'Pink'], ['#add8e6', 'Blue'], ['#90ee90', 'Green']].forEach(([value, label]) => {
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = label;
+    noteColorPicker.appendChild(opt);
+  });
+  Object.assign(noteColorPicker.style, {
+    position: 'fixed',
+    top: '300px',
+    right: '20px',
+    zIndex: '1000001',
+    padding: '4px'
+  });
+  document.body.appendChild(noteColorPicker);
+
+  redraw();
+  loadNotes();
 });
