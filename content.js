@@ -241,7 +241,63 @@ document.addEventListener('glasspen-activate', () => {
     fontFamily: 'sans-serif',
     boxShadow: '0 2px 10px rgba(0,0,0,0.15)'
   });
-  document.body.appendChild(toolbar);
+ // Set initial position AFTER appending to DOM
+document.body.appendChild(toolbar);
+
+
+
+// Defer the positioning to after render
+requestAnimationFrame(() => {
+  const padding = 20;
+  const toolbarWidth = toolbar.offsetWidth;
+  const toolbarHeight = toolbar.offsetHeight;
+
+  let initialLeft = window.innerWidth - toolbarWidth - padding;
+  let initialTop = padding;
+
+  initialLeft = Math.max(padding, Math.min(initialLeft, window.innerWidth - toolbarWidth - padding));
+  initialTop = Math.max(padding, Math.min(initialTop, window.innerHeight - toolbarHeight - padding));
+
+  toolbar.style.left = initialLeft + 'px';
+  toolbar.style.top = initialTop + 'px';
+  toolbar.style.right = 'auto';
+  toolbar.style.position = 'fixed';
+  toolbar.style.cursor = 'move';
+});
+
+let isDraggingToolbar = false;
+let dragStartX = 0, dragStartY = 0;
+let toolbarStartLeft = 0, toolbarStartTop = 0;
+
+toolbar.addEventListener('mousedown', (e) => {
+  if (e.target !== toolbar) return;
+  isDraggingToolbar = true;
+  dragStartX = e.clientX;
+  dragStartY = e.clientY;
+  toolbarStartLeft = parseInt(toolbar.style.left, 10);
+  toolbarStartTop = parseInt(toolbar.style.top, 10);
+  e.preventDefault();
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (!isDraggingToolbar) return;
+
+  const deltaX = e.clientX - dragStartX;
+  const deltaY = e.clientY - dragStartY;
+
+  const newLeft = Math.max(padding, Math.min(toolbarStartLeft + deltaX, window.innerWidth - toolbar.offsetWidth - padding));
+  const newTop = Math.max(padding, Math.min(toolbarStartTop + deltaY, window.innerHeight - toolbar.offsetHeight - padding));
+
+  toolbar.style.left = newLeft + 'px';
+  toolbar.style.top = newTop + 'px';
+});
+
+document.addEventListener('mouseup', () => {
+  isDraggingToolbar = false;
+});
+
+
+
 
   function createIconButton(iconHTML, onClick) {
     const btn = document.createElement('button');
@@ -268,7 +324,7 @@ document.addEventListener('glasspen-activate', () => {
   const penDropdown = document.createElement('div');
   penDropdown.style.cssText = 'display:flex; flex-direction:column; align-items:center; position:relative;';
   const penIcon = document.createElement('button');
-  penIcon.innerHTML = '<i class="fas fa-pen"></i>';
+  penIcon.innerHTML = `<img src="https://cdn-icons-png.flaticon.com/512/1250/1250615.png" alt="Pen" style="width:20px; height:20px;">`;
   Object.assign(penIcon.style, {
     width: '32px', height: '32px', borderRadius: '6px', border: '1px solid #aaa', backgroundColor: '#fff'
   });
@@ -318,7 +374,9 @@ document.addEventListener('glasspen-activate', () => {
   const highlightDropdown = document.createElement('div');
   highlightDropdown.style.cssText = 'display:flex; flex-direction:column; align-items:center; position:relative;';
   const highlightIcon = document.createElement('button');
-  highlightIcon.innerHTML = '<i class="fas fa-highlighter"></i>';
+highlightIcon.innerHTML = `<img src="https://cdn-icons-png.flaticon.com/512/1164/1164631.png" alt="Highlighter" style="width:20px; height:20px;">`;
+
+
   Object.assign(highlightIcon.style, {
     width: '32px', height: '32px', borderRadius: '6px', border: '1px solid #aaa', backgroundColor: '#fff'
   });
@@ -369,8 +427,9 @@ document.addEventListener('glasspen-activate', () => {
   // --- Sticky Note Tool ---
   const noteDropdown = document.createElement('div');
   noteDropdown.style.cssText = 'display:flex; flex-direction:column; align-items:center; position:relative;';
-  const stickyNoteBtn = document.createElement('button');
+ const stickyNoteBtn = document.createElement('button');
   stickyNoteBtn.innerHTML = '<i class="fas fa-sticky-note"></i>';
+
   Object.assign(stickyNoteBtn.style, {
     width: '32px', height: '32px', borderRadius: '6px', border: '1px solid #aaa', backgroundColor: '#fff'
   });
