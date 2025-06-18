@@ -1,6 +1,11 @@
 document.addEventListener('glasspen-activate', () => {
   if (document.getElementById('glasspen-canvas')) return;
 
+  const fa = document.createElement('link');
+  fa.rel = 'stylesheet';
+  fa.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css';
+  document.head.appendChild(fa);
+
   const STORAGE_KEY = 'glasspen_paths';
   const NOTES_KEY = 'glasspen_notes';
 
@@ -79,7 +84,7 @@ document.addEventListener('glasspen-activate', () => {
 
       function stopMove() {
         dragging = false;
-         note.style.cursor = 'grab'; 
+        note.style.cursor = 'grab';
         document.removeEventListener('mousemove', move);
         document.removeEventListener('mouseup', stopMove);
         saveNotes();
@@ -100,7 +105,7 @@ document.addEventListener('glasspen-activate', () => {
     textarea.oninput = saveNotes;
 
     const delBtn = document.createElement('button');
-    delBtn.textContent = '×';
+    delBtn.innerHTML = '<i class="fas fa-times"></i>';
     Object.assign(delBtn.style, {
       position: 'absolute',
       top: '2px',
@@ -137,10 +142,12 @@ document.addEventListener('glasspen-activate', () => {
 
   const ctx = canvas.getContext('2d');
   ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
 
   let drawing = false;
   let currentPath = [];
   let isEraser = false;
+  let isHighlight = false;
   let paths = loadPaths();
 
   function redraw() {
@@ -190,8 +197,8 @@ document.addEventListener('glasspen-activate', () => {
     }
 
     currentPath.push({ x, y });
-    ctx.strokeStyle = colorPicker.value;
-    ctx.lineWidth = parseInt(thicknessPicker.value);
+    ctx.strokeStyle = isHighlight ? 'rgba(255,255,0,0.4)' : colorPicker.value;
+    ctx.lineWidth = isHighlight ? 22 : parseInt(thicknessPicker.value);
     ctx.beginPath();
     const len = currentPath.length;
     if (len < 2) return;
@@ -204,9 +211,10 @@ document.addEventListener('glasspen-activate', () => {
     if (!drawing || isEraser) return;
     if (currentPath.length > 1) {
       paths.push({
-        color: colorPicker.value,
-        width: parseInt(thicknessPicker.value),
-        points: currentPath
+        color: isHighlight ? 'rgba(255,255,0,0.4)' : colorPicker.value,
+        width: isHighlight ? 22 : parseInt(thicknessPicker.value),
+        points: currentPath,
+        highlight: isHighlight
       });
       savePaths();
     }
@@ -228,61 +236,105 @@ document.addEventListener('glasspen-activate', () => {
   });
   canvas.addEventListener('touchend', stop);
 
-  window.addEventListener('resize', () => {
-    canvas.width = document.documentElement.scrollWidth;
-    canvas.height = document.documentElement.scrollHeight;
-    canvas.style.width = `${document.documentElement.scrollWidth}px`;
-    canvas.style.height = `${document.documentElement.scrollHeight}px`;
-    redraw();
+  const toolbar = document.createElement('div');
+  toolbar.id = 'glasspen-toolbar';
+  Object.assign(toolbar.style, {
+    position: 'fixed',
+    top: '20px',
+    right: '20px',
+    backgroundColor: '#f0f0f0',
+    border: '1px solid #ccc',
+    borderRadius: '8px',
+    padding: '10px',
+    zIndex: '1000001',
+    display: 'flex',
+    flexDirection: 'row',
+    gap: '8px',
+    fontFamily: 'sans-serif',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.15)'
   });
+  document.body.appendChild(toolbar);
 
-  function makeButton(text, top, action) {
+  function createIconButton(iconHTML, onClick) {
     const btn = document.createElement('button');
-    btn.textContent = text;
+    btn.innerHTML = iconHTML;
     Object.assign(btn.style, {
-      position: 'fixed',
-      top: `${top}px`,
-      right: '20px',
-      zIndex: '1000001',
-      padding: '8px 12px',
-      backgroundColor: '#fff',
-      border: '1px solid #000',
-      borderRadius: '5px',
-      fontSize: '14px',
+      width: '32px',
+      height: '32px',
+      fontSize: '16px',
       cursor: 'pointer',
+      borderRadius: '6px',
+      border: '1px solid #aaa',
+      backgroundColor: '#fff'
     });
-    btn.onclick = action;
-    document.body.appendChild(btn);
+    btn.onclick = () => {
+      onClick();
+      [...toolbar.querySelectorAll('button')].forEach(b => b.style.backgroundColor = '#fff');
+      btn.style.backgroundColor = '#ddd';
+    };
+    toolbar.appendChild(btn);
     return btn;
   }
 
-  const stopBtn = makeButton('❌ Stop', 20, () => {
-    [canvas, stopBtn, undoBtn, eraserBtn, colorPicker, thicknessPicker, clearBtn, noteBtn, noteColorPicker].forEach(el => el.remove());
+  createIconButton('<i class="fas fa-times"></i>', () => {
+    [canvas, toolbar].forEach(el => el.remove());
     document.querySelectorAll('.glasspen-note').forEach(n => n.remove());
   });
 
-  const undoBtn = makeButton('↩️ Undo', 60, () => {
+  createIconButton('<i class="fas fa-undo"></i>', () => {
     paths.pop();
     redraw();
   });
 
-  const eraserBtn = makeButton('🧽 Eraser: Off', 100, () => {
+  const eraserBtn = createIconButton('<i class="fas fa-eraser"></i>', () => {
     isEraser = !isEraser;
-    eraserBtn.textContent = isEraser ? '✏️ Eraser: On' : '🧽 Eraser: Off';
+    isHighlight = false;
+    redraw();
   });
 
-  const clearBtn = makeButton('🗑️ Clear All', 140, () => {
+  const highlightBtn = createIconButton('<i class="fas fa-highlighter"></i>', () => {
+    isHighlight = !isHighlight;
+    isEraser = false;
+    redraw();
+  });
+
+  createIconButton('<i class="fas fa-trash"></i>', () => {
     paths.length = 0;
     clearSavedPaths();
     redraw();
   });
 
-  const noteBtn = makeButton('📝 Add Note', 180, () => {
+  createIconButton('<i class="fas fa-sticky-note"></i>', () => {
     createStickyNote();
     saveNotes();
   });
 
-  const colorPicker = document.createElement('select');
+  const penDropdown = document.createElement('div');
+  penDropdown.style.display = 'flex';
+  penDropdown.style.flexDirection = 'column';
+  penDropdown.style.alignItems = 'center';
+
+  const penIcon = document.createElement('button');
+  penIcon.innerHTML = '<i class="fas fa-pen"></i>';
+  Object.assign(penIcon.style, {
+    width: '32px',
+    height: '32px',
+    borderRadius: '6px',
+    border: '1px solid #aaa',
+    backgroundColor: '#fff'
+  });
+  penDropdown.appendChild(penIcon);
+
+  const penOptions = document.createElement('div');
+  penOptions.style.display = 'none';
+  penOptions.style.position = 'absolute';
+  penOptions.style.marginTop = '40px';
+  penOptions.style.backgroundColor = '#fff';
+  penOptions.style.border = '1px solid #aaa';
+  penOptions.style.borderRadius = '6px';
+  penOptions.style.padding = '6px';
+
+  colorPicker = document.createElement('select');
   ['red', 'blue', 'green', 'black'].forEach(color => {
     const option = document.createElement('option');
     option.value = color;
@@ -290,31 +342,28 @@ document.addEventListener('glasspen-activate', () => {
     colorPicker.appendChild(option);
   });
   colorPicker.value = 'red';
-  Object.assign(colorPicker.style, {
-    position: 'fixed',
-    top: '220px',
-    right: '20px',
-    zIndex: '1000001',
-    padding: '4px'
-  });
-  document.body.appendChild(colorPicker);
+  penOptions.appendChild(colorPicker);
 
-  const thicknessPicker = document.createElement('select');
-  [1, 2, 4, 6].forEach(size => {
+  thicknessPicker = document.createElement('select');
+  [1, 2, 4, 6, 8, 10].forEach(size => {
     const option = document.createElement('option');
     option.value = size;
     option.textContent = `${size}px`;
     thicknessPicker.appendChild(option);
   });
   thicknessPicker.value = 2;
-  Object.assign(thicknessPicker.style, {
-    position: 'fixed',
-    top: '260px',
-    right: '20px',
-    zIndex: '1000001',
-    padding: '4px'
+  penOptions.appendChild(thicknessPicker);
+
+  penDropdown.appendChild(penOptions);
+  toolbar.appendChild(penDropdown);
+
+  penIcon.addEventListener('click', () => {
+    penOptions.style.display = penOptions.style.display === 'none' ? 'block' : 'none';
+    isHighlight = false;
+    isEraser = false;
+    [...toolbar.querySelectorAll('button')].forEach(b => b.style.backgroundColor = '#fff');
+    penIcon.style.backgroundColor = '#ddd';
   });
-  document.body.appendChild(thicknessPicker);
 
   const noteColorPicker = document.createElement('select');
   [['#ffff88', 'Yellow'], ['#ffc0cb', 'Pink'], ['#add8e6', 'Blue'], ['#90ee90', 'Green']].forEach(([value, label]) => {
@@ -323,14 +372,7 @@ document.addEventListener('glasspen-activate', () => {
     opt.textContent = label;
     noteColorPicker.appendChild(opt);
   });
-  Object.assign(noteColorPicker.style, {
-    position: 'fixed',
-    top: '300px',
-    right: '20px',
-    zIndex: '1000001',
-    padding: '4px'
-  });
-  document.body.appendChild(noteColorPicker);
+  toolbar.appendChild(noteColorPicker);
 
   redraw();
   loadNotes();
