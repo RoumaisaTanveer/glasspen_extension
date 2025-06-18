@@ -1,6 +1,7 @@
 document.addEventListener('glasspen-activate', () => {
   if (document.getElementById('glasspen-canvas')) return;
 
+  // FontAwesome for icons
   const fa = document.createElement('link');
   fa.rel = 'stylesheet';
   fa.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css';
@@ -12,23 +13,16 @@ document.addEventListener('glasspen-activate', () => {
   function savePaths() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(paths));
   }
-
   function loadPaths() {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        return [];
-      }
+      try { return JSON.parse(saved); } catch { return []; }
     }
     return [];
   }
-
   function clearSavedPaths() {
     localStorage.removeItem(STORAGE_KEY);
   }
-
   function saveNotes() {
     const notes = [...document.querySelectorAll('.glasspen-note')].map(note => ({
       text: note.querySelector('textarea').value,
@@ -38,7 +32,6 @@ document.addEventListener('glasspen-activate', () => {
     }));
     localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
   }
-
   function loadNotes() {
     const saved = localStorage.getItem(NOTES_KEY);
     if (!saved) return;
@@ -48,7 +41,47 @@ document.addEventListener('glasspen-activate', () => {
     } catch {}
   }
 
-  function createStickyNote(top = '300px', left = '300px', text = '', color = noteColorPicker?.value || '#ffff88') {
+  // --- Canvas ---
+  const canvas = document.createElement('canvas');
+  canvas.id = 'glasspen-canvas';
+  canvas.style.position = 'absolute';
+  canvas.style.top = '0';
+  canvas.style.left = '0';
+  canvas.style.width = `${window.innerWidth}px`;
+  canvas.style.height = `${window.innerHeight}px`;
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  canvas.style.zIndex = '999999';
+  canvas.style.pointerEvents = 'auto';
+  canvas.style.cursor = 'crosshair';
+  document.body.appendChild(canvas);
+
+  const ctx = canvas.getContext('2d');
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  let drawing = false;
+  let currentPath = [];
+  let isEraser = false;
+  let isHighlight = false;
+  let paths = loadPaths();
+
+  // --- TOOL STATE ---
+  let currentPenColor = 'red';
+  let currentPenThickness = 2;
+  let currentHighlightColor = 'rgba(255,255,0,0.4)';
+  let currentHighlightThickness = 22;
+  let currentNoteColor = '#ffff88';
+
+  // --- Sticky Notes ---
+  function createStickyNote(top, left, text = '', color = currentNoteColor) {
+    if (!top || !left) {
+      const noteWidth = 200, noteHeight = 150, padding = 40;
+      const maxLeft = window.innerWidth - noteWidth - padding;
+      const maxTop = window.innerHeight - noteHeight - padding;
+      left = Math.floor(Math.random() * maxLeft) + padding + 'px';
+      top = Math.floor(Math.random() * maxTop) + padding + 'px';
+    }
     const note = document.createElement('div');
     note.className = 'glasspen-note';
     Object.assign(note.style, {
@@ -63,25 +96,21 @@ document.addEventListener('glasspen-activate', () => {
       zIndex: '1000002',
       resize: 'both',
       overflow: 'auto',
-      boxShadow: '2px 2px 6px rgba(0,0,0,0.2)'
+      boxShadow: '2px 2px 6px rgba(0,0,0,0.2)',
+      cursor: 'grab'
     });
-    note.style.cursor = 'grab';
-    let offsetX, offsetY;
-    let dragging = false;
-
+    let offsetX, offsetY, dragging = false;
     note.addEventListener('mousedown', function (e) {
       if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON') return;
       dragging = true;
       note.style.cursor = 'grabbing';
       offsetX = e.clientX - note.offsetLeft;
       offsetY = e.clientY - note.offsetTop;
-
       function move(e) {
         if (!dragging) return;
         note.style.left = e.clientX - offsetX + 'px';
         note.style.top = e.clientY - offsetY + 'px';
       }
-
       function stopMove() {
         dragging = false;
         note.style.cursor = 'grab';
@@ -89,11 +118,9 @@ document.addEventListener('glasspen-activate', () => {
         document.removeEventListener('mouseup', stopMove);
         saveNotes();
       }
-
       document.addEventListener('mousemove', move);
       document.addEventListener('mouseup', stopMove);
     });
-
     const textarea = document.createElement('textarea');
     textarea.style.width = '100%';
     textarea.style.height = 'calc(100% - 25px)';
@@ -103,7 +130,6 @@ document.addEventListener('glasspen-activate', () => {
     textarea.style.resize = 'none';
     textarea.value = text;
     textarea.oninput = saveNotes;
-
     const delBtn = document.createElement('button');
     delBtn.innerHTML = '<i class="fas fa-times"></i>';
     Object.assign(delBtn.style, {
@@ -119,37 +145,12 @@ document.addEventListener('glasspen-activate', () => {
       note.remove();
       saveNotes();
     };
-
     note.appendChild(delBtn);
     note.appendChild(textarea);
     document.body.appendChild(note);
   }
 
-  const canvas = document.createElement('canvas');
-  canvas.id = 'glasspen-canvas';
-  canvas.style.position = 'absolute';
-  canvas.style.top = '0';
-  canvas.style.left = '0';
-  canvas.style.width = `${document.documentElement.scrollWidth}px`;
-  canvas.style.height = `${document.documentElement.scrollHeight}px`;
-  canvas.style.zIndex = '999999';
-  canvas.style.pointerEvents = 'auto';
-  canvas.style.cursor = 'crosshair';
-  document.body.appendChild(canvas);
-
-  canvas.width = document.documentElement.scrollWidth;
-  canvas.height = document.documentElement.scrollHeight;
-
-  const ctx = canvas.getContext('2d');
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-
-  let drawing = false;
-  let currentPath = [];
-  let isEraser = false;
-  let isHighlight = false;
-  let paths = loadPaths();
-
+  // --- Drawing Logic ---
   function redraw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     for (const path of paths) {
@@ -158,23 +159,18 @@ document.addEventListener('glasspen-activate', () => {
       ctx.beginPath();
       for (let i = 0; i < path.points.length; i++) {
         const p = path.points[i];
-        if (i === 0) {
-          ctx.moveTo(p.x, p.y);
-        } else {
-          ctx.lineTo(p.x, p.y);
-        }
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
       }
       ctx.stroke();
     }
     savePaths();
   }
-
   function eraseAt(x, y) {
     const threshold = 10;
     for (let i = paths.length - 1; i >= 0; i--) {
       for (const p of paths[i].points) {
-        const dx = p.x - x;
-        const dy = p.y - y;
+        const dx = p.x - x, dy = p.y - y;
         if (Math.sqrt(dx * dx + dy * dy) < threshold) {
           paths.splice(i, 1);
           redraw();
@@ -183,22 +179,16 @@ document.addEventListener('glasspen-activate', () => {
       }
     }
   }
-
   function start(x, y) {
     drawing = true;
     currentPath = [{ x, y }];
   }
-
   function draw(x, y) {
     if (!drawing) return;
-    if (isEraser) {
-      eraseAt(x, y);
-      return;
-    }
-
+    if (isEraser) return eraseAt(x, y);
     currentPath.push({ x, y });
-    ctx.strokeStyle = isHighlight ? 'rgba(255,255,0,0.4)' : colorPicker.value;
-    ctx.lineWidth = isHighlight ? 22 : parseInt(thicknessPicker.value);
+    ctx.strokeStyle = isHighlight ? currentHighlightColor : currentPenColor;
+    ctx.lineWidth = isHighlight ? currentHighlightThickness : currentPenThickness;
     ctx.beginPath();
     const len = currentPath.length;
     if (len < 2) return;
@@ -206,13 +196,12 @@ document.addEventListener('glasspen-activate', () => {
     ctx.lineTo(x, y);
     ctx.stroke();
   }
-
   function stop() {
     if (!drawing || isEraser) return;
     if (currentPath.length > 1) {
       paths.push({
-        color: isHighlight ? 'rgba(255,255,0,0.4)' : colorPicker.value,
-        width: isHighlight ? 22 : parseInt(thicknessPicker.value),
+        color: isHighlight ? currentHighlightColor : currentPenColor,
+        width: isHighlight ? currentHighlightThickness : currentPenThickness,
         points: currentPath,
         highlight: isHighlight
       });
@@ -220,12 +209,10 @@ document.addEventListener('glasspen-activate', () => {
     }
     drawing = false;
   }
-
   canvas.addEventListener('mousedown', e => start(e.pageX, e.pageY));
   canvas.addEventListener('mousemove', e => draw(e.pageX, e.pageY));
   canvas.addEventListener('mouseup', stop);
   canvas.addEventListener('mouseleave', stop);
-
   canvas.addEventListener('touchstart', e => {
     const touch = e.touches[0];
     start(touch.pageX, touch.pageY);
@@ -236,6 +223,7 @@ document.addEventListener('glasspen-activate', () => {
   });
   canvas.addEventListener('touchend', stop);
 
+  // --- Toolbar ---
   const toolbar = document.createElement('div');
   toolbar.id = 'glasspen-toolbar';
   Object.assign(toolbar.style, {
@@ -276,103 +264,210 @@ document.addEventListener('glasspen-activate', () => {
     return btn;
   }
 
-  createIconButton('<i class="fas fa-times"></i>', () => {
-    [canvas, toolbar].forEach(el => el.remove());
-    document.querySelectorAll('.glasspen-note').forEach(n => n.remove());
+  // --- Pen Tool ---
+  const penDropdown = document.createElement('div');
+  penDropdown.style.cssText = 'display:flex; flex-direction:column; align-items:center; position:relative;';
+  const penIcon = document.createElement('button');
+  penIcon.innerHTML = '<i class="fas fa-pen"></i>';
+  Object.assign(penIcon.style, {
+    width: '32px', height: '32px', borderRadius: '6px', border: '1px solid #aaa', backgroundColor: '#fff'
+  });
+  const penOptions = document.createElement('div');
+  penOptions.style.cssText = 'display:none; position:absolute; margin-top:40px; background:#fff; border:1px solid #aaa; border-radius:6px; padding:10px; gap:8px; flex-direction:column;';
+  // Pen color swatches
+  const penColors = ['red', 'blue', 'green', 'black', 'purple', 'orange'];
+  const penColorRow = document.createElement('div');
+  penColorRow.style.display = 'flex';
+  penColors.forEach(color => {
+    const colorBtn = document.createElement('button');
+    colorBtn.style.cssText = `width:24px; height:24px; border-radius:50%; background:${color}; border:2px solid #ccc; margin-right:4px;`;
+    colorBtn.onclick = () => {
+      currentPenColor = color;
+      penOptions.style.display = 'none';
+    };
+    penColorRow.appendChild(colorBtn);
+  });
+  penOptions.appendChild(penColorRow);
+  // Pen thickness slider
+  const penSliderLabel = document.createElement('label');
+  penSliderLabel.textContent = 'Thickness';
+  penSliderLabel.style.fontSize = '12px';
+  penSliderLabel.style.marginTop = '4px';
+  const penSlider = document.createElement('input');
+  penSlider.type = 'range';
+  penSlider.min = '1';
+  penSlider.max = '10';
+  penSlider.value = currentPenThickness;
+  penSlider.style.width = '100px';
+  penSlider.oninput = () => {
+    currentPenThickness = parseInt(penSlider.value);
+  };
+  penOptions.appendChild(penSliderLabel);
+  penOptions.appendChild(penSlider);
+  penDropdown.append(penIcon, penOptions);
+  toolbar.appendChild(penDropdown);
+  penIcon.addEventListener('click', () => {
+    penOptions.style.display = penOptions.style.display === 'none' ? 'flex' : 'none';
+    highlightOptions.style.display = 'none';
+    noteColorOptions.style.display = 'none';
+    isHighlight = false;
+    isEraser = false;
   });
 
+  // --- Highlighter Tool ---
+  const highlightDropdown = document.createElement('div');
+  highlightDropdown.style.cssText = 'display:flex; flex-direction:column; align-items:center; position:relative;';
+  const highlightIcon = document.createElement('button');
+  highlightIcon.innerHTML = '<i class="fas fa-highlighter"></i>';
+  Object.assign(highlightIcon.style, {
+    width: '32px', height: '32px', borderRadius: '6px', border: '1px solid #aaa', backgroundColor: '#fff'
+  });
+  const highlightOptions = document.createElement('div');
+  highlightOptions.style.cssText = 'display:none; position:absolute; margin-top:40px; background:#fff; border:1px solid #aaa; border-radius:6px; padding:10px; gap:8px; flex-direction:column;';
+  // Highlighter color swatches
+  const highlightColors = [
+    'rgba(255,255,0,0.4)', 'rgba(0,255,255,0.4)', 'rgba(255,0,255,0.4)', 'rgba(255,165,0,0.4)', 'rgba(0,255,0,0.4)'
+  ];
+  const highlightColorRow = document.createElement('div');
+  highlightColorRow.style.display = 'flex';
+  highlightColors.forEach(color => {
+    const colorBtn = document.createElement('button');
+    colorBtn.style.cssText = `width:24px; height:24px; border-radius:50%; background:${color}; border:2px solid #ccc; margin-right:4px;`;
+    colorBtn.onclick = () => {
+      currentHighlightColor = color;
+      highlightOptions.style.display = 'none';
+    };
+    highlightColorRow.appendChild(colorBtn);
+  });
+  highlightOptions.appendChild(highlightColorRow);
+  // Highlighter thickness slider
+  const highlightSliderLabel = document.createElement('label');
+  highlightSliderLabel.textContent = 'Thickness';
+  highlightSliderLabel.style.fontSize = '12px';
+  highlightSliderLabel.style.marginTop = '4px';
+  const highlightSlider = document.createElement('input');
+  highlightSlider.type = 'range';
+  highlightSlider.min = '10';
+  highlightSlider.max = '30';
+  highlightSlider.value = currentHighlightThickness;
+  highlightSlider.style.width = '100px';
+  highlightSlider.oninput = () => {
+    currentHighlightThickness = parseInt(highlightSlider.value);
+  };
+  highlightOptions.appendChild(highlightSliderLabel);
+  highlightOptions.appendChild(highlightSlider);
+  highlightDropdown.append(highlightIcon, highlightOptions);
+  toolbar.appendChild(highlightDropdown);
+  highlightIcon.addEventListener('click', () => {
+    highlightOptions.style.display = highlightOptions.style.display === 'none' ? 'flex' : 'none';
+    penOptions.style.display = 'none';
+    noteColorOptions.style.display = 'none';
+    isHighlight = true;
+    isEraser = false;
+  });
+
+  // --- Sticky Note Tool ---
+  const noteDropdown = document.createElement('div');
+  noteDropdown.style.cssText = 'display:flex; flex-direction:column; align-items:center; position:relative;';
+  const stickyNoteBtn = document.createElement('button');
+  stickyNoteBtn.innerHTML = '<i class="fas fa-sticky-note"></i>';
+  Object.assign(stickyNoteBtn.style, {
+    width: '32px', height: '32px', borderRadius: '6px', border: '1px solid #aaa', backgroundColor: '#fff'
+  });
+  const noteColorOptions = document.createElement('div');
+  noteColorOptions.style.cssText = 'display:none; position:absolute; margin-top:40px; background:#fff; border:1px solid #aaa; border-radius:6px; padding:10px; gap:8px; flex-direction:row;';
+  const noteColors = [
+    ['#ffff88', 'Yellow'],
+    ['#ffc0cb', 'Pink'],
+    ['#add8e6', 'Blue'],
+    ['#90ee90', 'Green'],
+    ['#fff', 'White']
+  ];
+  noteColors.forEach(([color, label]) => {
+    const colorBtn = document.createElement('button');
+    colorBtn.title = label;
+    colorBtn.style.cssText = `width:24px; height:24px; border-radius:50%; background:${color}; border:2px solid #ccc; margin-right:4px;`;
+    colorBtn.onclick = () => {
+      currentNoteColor = color;
+      noteColorOptions.style.display = 'none';
+      createStickyNote(undefined, undefined, '', currentNoteColor);
+      saveNotes();
+    };
+    noteColorOptions.appendChild(colorBtn);
+  });
+  noteDropdown.append(stickyNoteBtn, noteColorOptions);
+  toolbar.appendChild(noteDropdown);
+  stickyNoteBtn.addEventListener('click', () => {
+    noteColorOptions.style.display = noteColorOptions.style.display === 'none' ? 'flex' : 'none';
+    penOptions.style.display = 'none';
+    highlightOptions.style.display = 'none';
+  });
+
+  // --- Other Toolbar Buttons ---
   createIconButton('<i class="fas fa-undo"></i>', () => {
     paths.pop();
     redraw();
   });
-
-  const eraserBtn = createIconButton('<i class="fas fa-eraser"></i>', () => {
+  createIconButton('<i class="fas fa-eraser"></i>', () => {
     isEraser = !isEraser;
     isHighlight = false;
+    penOptions.style.display = 'none';
+    highlightOptions.style.display = 'none';
+    noteColorOptions.style.display = 'none';
     redraw();
   });
-
-  const highlightBtn = createIconButton('<i class="fas fa-highlighter"></i>', () => {
-    isHighlight = !isHighlight;
-    isEraser = false;
-    redraw();
-  });
-
   createIconButton('<i class="fas fa-trash"></i>', () => {
     paths.length = 0;
     clearSavedPaths();
     redraw();
+    document.querySelectorAll('.glasspen-note').forEach(note => note.remove());
+    localStorage.removeItem(NOTES_KEY);
+  });
+  createIconButton('<i class="fas fa-times"></i>', () => {
+    [canvas, toolbar, noteDropdown].forEach(el => el && el.remove());
+    document.querySelectorAll('.glasspen-note').forEach(n => n.remove());
   });
 
-  createIconButton('<i class="fas fa-sticky-note"></i>', () => {
-    createStickyNote();
+  // --- Dropdown close logic ---
+  document.addEventListener('mousedown', (e) => {
+    if (!penDropdown.contains(e.target)) penOptions.style.display = 'none';
+    if (!highlightDropdown.contains(e.target)) highlightOptions.style.display = 'none';
+    if (!noteDropdown.contains(e.target)) noteColorOptions.style.display = 'none';
+  });
+
+  // --- Window resize handler ---
+  function handleResize() {
+    const oldWidth = canvas.width;
+    const oldHeight = canvas.height;
+    const newWidth = window.innerWidth;
+    const newHeight = window.innerHeight;
+    const scaleX = newWidth / oldWidth;
+    const scaleY = newHeight / oldHeight;
+    canvas.width = newWidth;
+    canvas.height = newHeight;
+    canvas.style.width = `${newWidth}px`;
+    canvas.style.height = `${newHeight}px`;
+    paths = paths.map(path => ({
+      ...path,
+      points: path.points.map(point => ({
+        x: point.x * scaleX,
+        y: point.y * scaleY
+      }))
+    }));
+    document.querySelectorAll('.glasspen-note').forEach(note => {
+      const left = parseFloat(note.style.left);
+      const top = parseFloat(note.style.top);
+      note.style.left = (left * scaleX) + 'px';
+      note.style.top = (top * scaleY) + 'px';
+    });
+    redraw();
     saveNotes();
+  }
+  let resizeTimeout;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(handleResize, 150);
   });
-
-  const penDropdown = document.createElement('div');
-  penDropdown.style.display = 'flex';
-  penDropdown.style.flexDirection = 'column';
-  penDropdown.style.alignItems = 'center';
-
-  const penIcon = document.createElement('button');
-  penIcon.innerHTML = '<i class="fas fa-pen"></i>';
-  Object.assign(penIcon.style, {
-    width: '32px',
-    height: '32px',
-    borderRadius: '6px',
-    border: '1px solid #aaa',
-    backgroundColor: '#fff'
-  });
-  penDropdown.appendChild(penIcon);
-
-  const penOptions = document.createElement('div');
-  penOptions.style.display = 'none';
-  penOptions.style.position = 'absolute';
-  penOptions.style.marginTop = '40px';
-  penOptions.style.backgroundColor = '#fff';
-  penOptions.style.border = '1px solid #aaa';
-  penOptions.style.borderRadius = '6px';
-  penOptions.style.padding = '6px';
-
-  colorPicker = document.createElement('select');
-  ['red', 'blue', 'green', 'black'].forEach(color => {
-    const option = document.createElement('option');
-    option.value = color;
-    option.textContent = color;
-    colorPicker.appendChild(option);
-  });
-  colorPicker.value = 'red';
-  penOptions.appendChild(colorPicker);
-
-  thicknessPicker = document.createElement('select');
-  [1, 2, 4, 6, 8, 10].forEach(size => {
-    const option = document.createElement('option');
-    option.value = size;
-    option.textContent = `${size}px`;
-    thicknessPicker.appendChild(option);
-  });
-  thicknessPicker.value = 2;
-  penOptions.appendChild(thicknessPicker);
-
-  penDropdown.appendChild(penOptions);
-  toolbar.appendChild(penDropdown);
-
-  penIcon.addEventListener('click', () => {
-    penOptions.style.display = penOptions.style.display === 'none' ? 'block' : 'none';
-    isHighlight = false;
-    isEraser = false;
-    [...toolbar.querySelectorAll('button')].forEach(b => b.style.backgroundColor = '#fff');
-    penIcon.style.backgroundColor = '#ddd';
-  });
-
-  const noteColorPicker = document.createElement('select');
-  [['#ffff88', 'Yellow'], ['#ffc0cb', 'Pink'], ['#add8e6', 'Blue'], ['#90ee90', 'Green']].forEach(([value, label]) => {
-    const opt = document.createElement('option');
-    opt.value = value;
-    opt.textContent = label;
-    noteColorPicker.appendChild(opt);
-  });
-  toolbar.appendChild(noteColorPicker);
 
   redraw();
   loadNotes();
