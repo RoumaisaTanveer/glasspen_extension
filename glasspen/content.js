@@ -578,7 +578,7 @@ explainBtn.addEventListener('click', async () => {
   }
 
   try {
-    const response = await fetch('http://localhost:3000/summarize', {
+    const response = await fetch('http://localhost:3000/explain', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: "Explain this: " + selectedText })
@@ -667,3 +667,7 @@ toolbar.appendChild(explainBtn);
   redraw();
   loadNotes();
 });
+// Automatically activate and restore drawing/notes if data exists in localStorage
+if (localStorage.getItem('glasspen_paths') || localStorage.getItem('glasspen_notes')) {
+  document.dispatchEvent(new Event('glasspen-activate'));
+}

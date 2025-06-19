@@ -6,16 +6,14 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ✅ Use your OpenRouter key here (starts with sk-or-)
 const OPENROUTER_API_KEY = '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';
 
-app.post('/summarize', async (req, res) => {
+// Common AI request handler
+const handleAIRequest = async (req, res, instruction) => {
   const { text } = req.body;
   if (!text || typeof text !== 'string') {
     return res.status(400).json({ error: 'Invalid input text.' });
   }
-
-  console.log('🔹 Request received with text:', text);
 
   try {
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -23,34 +21,52 @@ app.post('/summarize', async (req, res) => {
       headers: {
         'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://yourproject.com', // Can be left blank if testing locally
+        'HTTP-Referer': 'https://yourproject.com',
         'X-Title': 'GlassPen AI'
       },
       body: JSON.stringify({
-        model: 'openai/gpt-3.5-turbo', // or 'perplexity/pplx-7b-online'
+        model: 'openai/gpt-3.5-turbo',
         messages: [
-          { role: 'system', content: 'You are a helpful assistant that summarizes or explains web content.' },
+          { 
+            role: 'system', 
+            content: instruction 
+          },
           { role: 'user', content: text }
         ]
       })
     });
 
-    const data = await response.json();
-    console.log('🧠 OpenRouter raw response:', JSON.stringify(data, null, 2));
-
-    const reply = data?.choices?.[0]?.message?.content;
-    if (!reply) {
-      return res.status(500).json({ summary: '❌ No response from OpenRouter.' });
+    // Handle non-200 responses from OpenRouter
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`OpenRouter error: ${response.status} ${errorText}`);
     }
 
+    const data = await response.json();
+    // FIXED: Removed extra dot in optional chaining
+    const reply = data?.choices[0]?.message?.content;
+    
+    if (!reply) {
+      throw new Error('No content in OpenRouter response');
+    }
+    
     res.json({ summary: reply });
 
   } catch (err) {
-    console.error('❌ OpenRouter API error:', err);
+    console.error('❌ API error:', err);
     res.status(500).json({ error: err.message || 'Internal server error.' });
   }
+};
+
+// Separate endpoints
+app.post('/summarize', (req, res) => {
+  handleAIRequest(req, res, 'You are a helpful assistant that summarizes web content concisely.');
+});
+
+app.post('/explain', (req, res) => {
+  handleAIRequest(req, res, 'You are a helpful assistant that explains concepts in an educational manner.');
 });
 
 app.listen(3000, () => {
-  console.log('🟢 OpenRouter (GPT-3.5) backend running at http://localhost:3000');
+  console.log('🟢 Backend running at http://localhost:3000');
 });
