@@ -298,8 +298,8 @@ document.body.appendChild(toolbar);
    
 
 // Defer the positioning to after render  so that tool bar doesnt go out of window size
+const padding = 20;
 requestAnimationFrame(() => {
-  const padding = 20;
   const toolbarWidth = toolbar.offsetWidth;
   const toolbarHeight = toolbar.offsetHeight;
 
@@ -321,7 +321,8 @@ let dragStartX = 0, dragStartY = 0;
 let toolbarStartLeft = 0, toolbarStartTop = 0;
 
 toolbar.addEventListener('mousedown', (e) => {
-  if (e.target !== toolbar) return;
+  // Prevent drag if clicking a button or input
+  if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
   isDraggingToolbar = true;
   dragStartX = e.clientX;
   dragStartY = e.clientY;
@@ -329,6 +330,7 @@ toolbar.addEventListener('mousedown', (e) => {
   toolbarStartTop = parseInt(toolbar.style.top, 10);
   e.preventDefault();
 });
+
 
 document.addEventListener('mousemove', (e) => {
   if (!isDraggingToolbar) return;
@@ -532,6 +534,8 @@ summarizeBtn.addEventListener('click', async () => {
     alert('Please select some text to summarize.');
     return;
   }
+  summarizeBtn.disabled = true;
+  summarizeBtn.innerHTML = `<i class="fa fa-magic fa-spin"></i> Summarizing...`;
 
   try {
     const response = await fetch('http://localhost:3000/summarize', {
@@ -551,7 +555,12 @@ summarizeBtn.addEventListener('click', async () => {
   } catch (err) {
     console.error('Error summarizing:', err);
     alert('Something went wrong while summarizing.');
+  }finally {
+    // Remove loading state
+    summarizeBtn.disabled = false;
+    summarizeBtn.innerHTML = `<i class="fas fa-scroll"></i>`;
   }
+
 });
 
   toolbar.appendChild(summarizeBtn);
@@ -575,8 +584,11 @@ explainBtn.addEventListener('click', async () => {
   if (!selectedText) {
     alert('Please select some text to explain.');
     return;
-  }
 
+  }
+  
+explainBtn.disabled = true;
+explainBtn.innerHTML = `<i class="fa fa-magic fa-spin"></i> Explaining...`;
   try {
     const response = await fetch('http://localhost:3000/explain', {
       method: 'POST',
@@ -593,6 +605,10 @@ explainBtn.addEventListener('click', async () => {
   } catch (err) {
     console.error('Error explaining:', err);
     alert('Something went wrong while explaining.');
+  }finally {
+    // Remove loading state
+    explainBtn.disabled = false;
+    explainBtn.innerHTML = `<i class="fas fa-magic"></i>`;
   }
 });
 
