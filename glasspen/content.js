@@ -47,10 +47,10 @@ document.addEventListener('glasspen-activate', () => {
   canvas.style.position = 'absolute';
   canvas.style.top = '0';
   canvas.style.left = '0';
-  canvas.style.width = `${window.innerWidth}px`;
-  canvas.style.height = `${window.innerHeight}px`;
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
+  canvas.style.width = `${document.documentElement.scrollWidth}px`;
+  canvas.style.height = `${document.documentElement.scrollHeight}px`;
+  canvas.width = document.documentElement.scrollWidth;
+  canvas.height = document.documentElement.scrollHeight;
   canvas.style.zIndex = '999999';
   canvas.style.pointerEvents = 'auto';
   canvas.style.cursor = 'crosshair';
@@ -100,10 +100,6 @@ document.addEventListener('glasspen-activate', () => {
       cursor: 'grab'
     });
     let offsetX, offsetY, dragging = false;
-     
-
-    
-  
 
     note.addEventListener('mousedown', function (e) {
       if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON') return;
@@ -154,52 +150,53 @@ document.addEventListener('glasspen-activate', () => {
     note.appendChild(textarea);
     document.body.appendChild(note);
   }
-function showGlasspenPopup(text, label = 'AI Response') {
-  const popup = document.createElement('div');
-  Object.assign(popup.style, {
-    position: 'fixed',
-    top: '80px',
-    right: '20px',
-    maxWidth: '360px',
-    backgroundColor: '#fff',
-    border: '1px solid #ccc',
-    borderRadius: '8px',
-    padding: '12px 16px 16px',
-    boxShadow: '0 2px 12px rgba(0,0,0,0.2)',
-    zIndex: '1000003',
-    fontSize: '14px',
-    fontFamily: 'sans-serif',
-    color: '#333',
-    whiteSpace: 'pre-wrap',
-    lineHeight: '1.5'
-  });
 
-  const heading = document.createElement('div');
-  heading.textContent = label;
-  heading.style.cssText = 'font-weight: bold; margin-bottom: 8px; font-size: 15px; color: #444;';
-  popup.appendChild(heading);
+  function showGlasspenPopup(text, label = 'AI Response') {
+    const popup = document.createElement('div');
+    Object.assign(popup.style, {
+      position: 'fixed',
+      top: '80px',
+      right: '20px',
+      maxWidth: '360px',
+      backgroundColor: '#fff',
+      border: '1px solid #ccc',
+      borderRadius: '8px',
+      padding: '12px 16px 16px',
+      boxShadow: '0 2px 12px rgba(0,0,0,0.2)',
+      zIndex: '1000003',
+      fontSize: '14px',
+      fontFamily: 'sans-serif',
+      color: '#333',
+      whiteSpace: 'pre-wrap',
+      lineHeight: '1.5'
+    });
 
-  const content = document.createElement('div');
-  content.textContent = text;
-  popup.appendChild(content);
+    const heading = document.createElement('div');
+    heading.textContent = label;
+    heading.style.cssText = 'font-weight: bold; margin-bottom: 8px; font-size: 15px; color: #444;';
+    popup.appendChild(heading);
 
-  const closeBtn = document.createElement('button');
-  closeBtn.textContent = '✖';
-  Object.assign(closeBtn.style, {
-    position: 'absolute',
-    top: '6px',
-    right: '10px',
-    background: 'transparent',
-    border: 'none',
-    fontSize: '14px',
-    cursor: 'pointer',
-    color: '#666'
-  });
-  closeBtn.onclick = () => popup.remove();
+    const content = document.createElement('div');
+    content.textContent = text;
+    popup.appendChild(content);
 
-  popup.appendChild(closeBtn);
-  document.body.appendChild(popup);
-}
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✖';
+    Object.assign(closeBtn.style, {
+      position: 'absolute',
+      top: '6px',
+      right: '10px',
+      background: 'transparent',
+      border: 'none',
+      fontSize: '14px',
+      cursor: 'pointer',
+      color: '#666'
+    });
+    closeBtn.onclick = () => popup.remove();
+
+    popup.appendChild(closeBtn);
+    document.body.appendChild(popup);
+  }
 
   // --- Drawing Logic ---
   function redraw() {
@@ -260,19 +257,58 @@ function showGlasspenPopup(text, label = 'AI Response') {
     }
     drawing = false;
   }
-  canvas.addEventListener('mousedown', e => start(e.pageX, e.pageY));
-  canvas.addEventListener('mousemove', e => draw(e.pageX, e.pageY));
-  canvas.addEventListener('mouseup', stop);
-  canvas.addEventListener('mouseleave', stop);
-  canvas.addEventListener('touchstart', e => {
-    const touch = e.touches[0];
-    start(touch.pageX, touch.pageY);
-  });
-  canvas.addEventListener('touchmove', e => {
-    const touch = e.touches[0];
-    draw(touch.pageX, touch.pageY);
-  });
-  canvas.addEventListener('touchend', stop);
+
+  function getPageCoords(e) {
+    if (e.touches && e.touches.length) {
+      return {
+        x: e.touches[0].pageX,
+        y: e.touches[0].pageY
+      };
+    }
+    return {
+      x: e.pageX,
+      y: e.pageY
+    };
+  }
+
+  // Drawing event listeners (enabled only when drawing mode is ON)
+  function enableCanvasEvents() {
+    canvas.addEventListener('mousedown', onMouseDown);
+    canvas.addEventListener('mousemove', onMouseMove);
+    canvas.addEventListener('mouseup', onMouseUp);
+    canvas.addEventListener('mouseleave', onMouseUp);
+    canvas.addEventListener('touchstart', onTouchStart);
+    canvas.addEventListener('touchmove', onTouchMove);
+    canvas.addEventListener('touchend', onMouseUp);
+  }
+  function disableCanvasEvents() {
+    canvas.removeEventListener('mousedown', onMouseDown);
+    canvas.removeEventListener('mousemove', onMouseMove);
+    canvas.removeEventListener('mouseup', onMouseUp);
+    canvas.removeEventListener('mouseleave', onMouseUp);
+    canvas.removeEventListener('touchstart', onTouchStart);
+    canvas.removeEventListener('touchmove', onTouchMove);
+    canvas.removeEventListener('touchend', onMouseUp);
+  }
+  function onMouseDown(e) {
+    const { x, y } = getPageCoords(e);
+    start(x, y);
+  }
+  function onMouseMove(e) {
+    const { x, y } = getPageCoords(e);
+    draw(x, y);
+  }
+  function onMouseUp(e) {
+    stop();
+  }
+  function onTouchStart(e) {
+    const { x, y } = getPageCoords(e);
+    start(x, y);
+  }
+  function onTouchMove(e) {
+    const { x, y } = getPageCoords(e);
+    draw(x, y);
+  }
 
   // --- Toolbar ---
   const toolbar = document.createElement('div');
@@ -292,65 +328,50 @@ function showGlasspenPopup(text, label = 'AI Response') {
     fontFamily: 'sans-serif',
     boxShadow: '0 2px 10px rgba(0,0,0,0.15)'
   });
- // Set initial position AFTER appending to DOM
-document.body.appendChild(toolbar);
+  document.body.appendChild(toolbar);
 
-   
+  // Toolbar positioning
+  const padding = 20;
+  requestAnimationFrame(() => {
+    const toolbarWidth = toolbar.offsetWidth;
+    const toolbarHeight = toolbar.offsetHeight;
+    let initialLeft = window.innerWidth - toolbarWidth - padding;
+    let initialTop = padding;
+    initialLeft = Math.max(padding, Math.min(initialLeft, window.innerWidth - toolbarWidth - padding));
+    initialTop = Math.max(padding, Math.min(initialTop, window.innerHeight - toolbarHeight - padding));
+    toolbar.style.left = initialLeft + 'px';
+    toolbar.style.top = initialTop + 'px';
+    toolbar.style.right = 'auto';
+    toolbar.style.position = 'fixed';
+    toolbar.style.cursor = 'move';
+  });
 
-// Defer the positioning to after render  so that tool bar doesnt go out of window size
-const padding = 20;
-requestAnimationFrame(() => {
-  const toolbarWidth = toolbar.offsetWidth;
-  const toolbarHeight = toolbar.offsetHeight;
+  let isDraggingToolbar = false;
+  let dragStartX = 0, dragStartY = 0;
+  let toolbarStartLeft = 0, toolbarStartTop = 0;
 
-  let initialLeft = window.innerWidth - toolbarWidth - padding;
-  let initialTop = padding;
+  toolbar.addEventListener('mousedown', (e) => {
+    if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+    isDraggingToolbar = true;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    toolbarStartLeft = parseInt(toolbar.style.left, 10);
+    toolbarStartTop = parseInt(toolbar.style.top, 10);
+    e.preventDefault();
+  });
 
-  initialLeft = Math.max(padding, Math.min(initialLeft, window.innerWidth - toolbarWidth - padding));
-  initialTop = Math.max(padding, Math.min(initialTop, window.innerHeight - toolbarHeight - padding));
-
-  toolbar.style.left = initialLeft + 'px';
-  toolbar.style.top = initialTop + 'px';
-  toolbar.style.right = 'auto';
-  toolbar.style.position = 'fixed';
-  toolbar.style.cursor = 'move';
-});
-
-let isDraggingToolbar = false;
-let dragStartX = 0, dragStartY = 0;
-let toolbarStartLeft = 0, toolbarStartTop = 0;
-
-toolbar.addEventListener('mousedown', (e) => {
-  // Prevent drag if clicking a button or input
-  if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
-  isDraggingToolbar = true;
-  dragStartX = e.clientX;
-  dragStartY = e.clientY;
-  toolbarStartLeft = parseInt(toolbar.style.left, 10);
-  toolbarStartTop = parseInt(toolbar.style.top, 10);
-  e.preventDefault();
-});
-
-
-document.addEventListener('mousemove', (e) => {
-  if (!isDraggingToolbar) return;
-
-  const deltaX = e.clientX - dragStartX;
-  const deltaY = e.clientY - dragStartY;
-
-  const newLeft = Math.max(padding, Math.min(toolbarStartLeft + deltaX, window.innerWidth - toolbar.offsetWidth - padding));
-  const newTop = Math.max(padding, Math.min(toolbarStartTop + deltaY, window.innerHeight - toolbar.offsetHeight - padding));
-
-  toolbar.style.left = newLeft + 'px';
-  toolbar.style.top = newTop + 'px';
-});
-
-document.addEventListener('mouseup', () => {
-  isDraggingToolbar = false;
-});
-
-
-
+  document.addEventListener('mousemove', (e) => {
+    if (!isDraggingToolbar) return;
+    const deltaX = e.clientX - dragStartX;
+    const deltaY = e.clientY - dragStartY;
+    const newLeft = Math.max(padding, Math.min(toolbarStartLeft + deltaX, window.innerWidth - toolbar.offsetWidth - padding));
+    const newTop = Math.max(padding, Math.min(toolbarStartTop + deltaY, window.innerHeight - toolbar.offsetHeight - padding));
+    toolbar.style.left = newLeft + 'px';
+    toolbar.style.top = newTop + 'px';
+  });
+  document.addEventListener('mouseup', () => {
+    isDraggingToolbar = false;
+  });
 
   function createIconButton(iconHTML, onClick) {
     const btn = document.createElement('button');
@@ -373,6 +394,49 @@ document.addEventListener('mouseup', () => {
     return btn;
   }
 
+  // --- CLEAR DRAW TOGGLE BUTTON ---
+  let drawingEnabled = true;
+  const drawToggleBtn = document.createElement('button');
+  // Use a toggle switch icon and clear label
+  drawToggleBtn.innerHTML = `<span id="draw-toggle-label" style="font-weight:bold;">Disable Drawing</span>`;
+  drawToggleBtn.title = 'Enable or Disable Drawing Mode';
+  Object.assign(drawToggleBtn.style, {
+    height: '32px',
+    padding: '0 16px',
+    fontSize: '15px',
+    cursor: 'pointer',
+    borderRadius: '6px',
+    border: '1px solid #aaa',
+    backgroundColor: '#4caf50', // green for ON
+    color: '#fff',
+    fontWeight: 'bold'
+  });
+  toolbar.appendChild(drawToggleBtn);
+
+  function updateDrawingMode() {
+    const label = drawToggleBtn.querySelector('#draw-toggle-label');
+    if (drawingEnabled) {
+      canvas.style.pointerEvents = 'auto';
+      canvas.style.cursor = 'crosshair';
+      drawToggleBtn.style.backgroundColor = '#4caf50'; // green
+      label.textContent = 'Disable';
+    } else {
+      canvas.style.pointerEvents = 'none';
+      canvas.style.cursor = 'default';
+      drawToggleBtn.style.backgroundColor = '#aaa'; // gray
+      label.textContent = 'Enable';
+    }
+    drawToggleBtn.style.color = '#fff';
+  }
+  drawToggleBtn.onclick = () => {
+    drawingEnabled = !drawingEnabled;
+    if (drawingEnabled) enableCanvasEvents();
+    else disableCanvasEvents();
+    updateDrawingMode();
+  };
+  enableCanvasEvents();
+  updateDrawingMode();
+
   // --- Pen Tool ---
   const penDropdown = document.createElement('div');
   penDropdown.style.cssText = 'display:flex; flex-direction:column; align-items:center; position:relative;';
@@ -383,7 +447,6 @@ document.addEventListener('mouseup', () => {
   });
   const penOptions = document.createElement('div');
   penOptions.style.cssText = 'display:none; position:absolute; margin-top:40px; background:#fff; border:1px solid #aaa; border-radius:6px; padding:10px; gap:8px; flex-direction:column;';
-  // Pen color swatches
   const penColors = ['red', 'blue', 'green', 'black', 'purple', 'orange'];
   const penColorRow = document.createElement('div');
   penColorRow.style.display = 'flex';
@@ -397,7 +460,6 @@ document.addEventListener('mouseup', () => {
     penColorRow.appendChild(colorBtn);
   });
   penOptions.appendChild(penColorRow);
-  // Pen thickness slider
   const penSliderLabel = document.createElement('label');
   penSliderLabel.textContent = 'Thickness';
   penSliderLabel.style.fontSize = '12px';
@@ -427,15 +489,12 @@ document.addEventListener('mouseup', () => {
   const highlightDropdown = document.createElement('div');
   highlightDropdown.style.cssText = 'display:flex; flex-direction:column; align-items:center; position:relative;';
   const highlightIcon = document.createElement('button');
-highlightIcon.innerHTML = `<img src="https://cdn-icons-png.flaticon.com/512/1164/1164631.png" alt="Highlighter" style="width:20px; height:20px;">`;
-
-
+  highlightIcon.innerHTML = `<img src="https://cdn-icons-png.flaticon.com/512/1164/1164631.png" alt="Highlighter" style="width:20px; height:20px;">`;
   Object.assign(highlightIcon.style, {
     width: '32px', height: '32px', borderRadius: '6px', border: '1px solid #aaa', backgroundColor: '#fff'
   });
   const highlightOptions = document.createElement('div');
   highlightOptions.style.cssText = 'display:none; position:absolute; margin-top:40px; background:#fff; border:1px solid #aaa; border-radius:6px; padding:10px; gap:8px; flex-direction:column;';
-  // Highlighter color swatches
   const highlightColors = [
     'rgba(255,255,0,0.4)', 'rgba(0,255,255,0.4)', 'rgba(255,0,255,0.4)', 'rgba(255,165,0,0.4)', 'rgba(0,255,0,0.4)'
   ];
@@ -451,7 +510,6 @@ highlightIcon.innerHTML = `<img src="https://cdn-icons-png.flaticon.com/512/1164
     highlightColorRow.appendChild(colorBtn);
   });
   highlightOptions.appendChild(highlightColorRow);
-  // Highlighter thickness slider
   const highlightSliderLabel = document.createElement('label');
   highlightSliderLabel.textContent = 'Thickness';
   highlightSliderLabel.style.fontSize = '12px';
@@ -480,9 +538,8 @@ highlightIcon.innerHTML = `<img src="https://cdn-icons-png.flaticon.com/512/1164
   // --- Sticky Note Tool ---
   const noteDropdown = document.createElement('div');
   noteDropdown.style.cssText = 'display:flex; flex-direction:column; align-items:center; position:relative;';
- const stickyNoteBtn = document.createElement('button');
+  const stickyNoteBtn = document.createElement('button');
   stickyNoteBtn.innerHTML = '<i class="fas fa-sticky-note"></i>';
-
   Object.assign(stickyNoteBtn.style, {
     width: '32px', height: '32px', borderRadius: '6px', border: '1px solid #aaa', backgroundColor: '#fff'
   });
@@ -514,105 +571,88 @@ highlightIcon.innerHTML = `<img src="https://cdn-icons-png.flaticon.com/512/1164
     penOptions.style.display = 'none';
     highlightOptions.style.display = 'none';
   });
-   // --- Summarize Tool ---
-const summarizeBtn = document.createElement('button');
-summarizeBtn.innerHTML = `<i class="fas fa-scroll"></i>`;
-summarizeBtn.title = 'Summarize Selected Text';
-Object.assign(summarizeBtn.style, {
-  width: '32px',
-  height: '32px',
-  fontSize: '16px',
-  cursor: 'pointer',
-  borderRadius: '6px',
-  border: '1px solid #aaa',
-  backgroundColor: '#fff'
-});
 
-summarizeBtn.addEventListener('click', async () => {
-  const selectedText = window.getSelection().toString().trim();
-  if (!selectedText) {
-    alert('Please select some text to summarize.');
-    return;
-  }
-  summarizeBtn.disabled = true;
-  summarizeBtn.innerHTML = `<i class="fa fa-magic fa-spin"></i> Summarizing...`;
+  // --- Summarize Tool ---
+  const summarizeBtn = document.createElement('button');
+  summarizeBtn.innerHTML = `<i class="fas fa-scroll"></i>`;
+  summarizeBtn.title = 'Summarize Selected Text';
+  Object.assign(summarizeBtn.style, {
+    width: '32px',
+    height: '32px',
+    fontSize: '16px',
+    cursor: 'pointer',
+    borderRadius: '6px',
+    border: '1px solid #aaa',
+    backgroundColor: '#fff'
+  });
 
-  try {
-    const response = await fetch('http://localhost:3000/summarize', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: selectedText })
-    });
-
-    const data = await response.json();
-    const summary = data.summary || 'No summary returned.';
-
-    // For now, show in an alert (you can later render it in a sticky note)
-   showGlasspenPopup(summary, 'Summary');
-
-
-
-  } catch (err) {
-    console.error('Error summarizing:', err);
-    alert('Something went wrong while summarizing.');
-  }finally {
-    // Remove loading state
-    summarizeBtn.disabled = false;
-    summarizeBtn.innerHTML = `<i class="fas fa-scroll"></i>`;
-  }
-
-});
-
+  summarizeBtn.addEventListener('click', async () => {
+    const selectedText = window.getSelection().toString().trim();
+    if (!selectedText) {
+      alert('Please select some text to summarize.');
+      return;
+    }
+    summarizeBtn.disabled = true;
+    summarizeBtn.innerHTML = `<i class="fa fa-magic fa-spin"></i> Summarizing...`;
+    try {
+      const response = await fetch('http://localhost:3000/summarize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: selectedText })
+      });
+      const data = await response.json();
+      const summary = data.summary || 'No summary returned.';
+      showGlasspenPopup(summary, 'Summary');
+    } catch (err) {
+      console.error('Error summarizing:', err);
+      alert('Something went wrong while summarizing.');
+    } finally {
+      summarizeBtn.disabled = false;
+      summarizeBtn.innerHTML = `<i class="fas fa-scroll"></i>`;
+    }
+  });
   toolbar.appendChild(summarizeBtn);
-  
-// --- Explain Tool ---
-const explainBtn = document.createElement('button');
-explainBtn.innerHTML = `<i class="fas fa-magic"></i>`; // 🪄 magic wand icon
-explainBtn.title = 'Explain Selected Text';
-Object.assign(explainBtn.style, {
-  width: '32px',
-  height: '32px',
-  fontSize: '16px',
-  cursor: 'pointer',
-  borderRadius: '6px',
-  border: '1px solid #aaa',
-  backgroundColor: '#fff'
-});
 
-explainBtn.addEventListener('click', async () => {
-  const selectedText = window.getSelection().toString().trim();
-  if (!selectedText) {
-    alert('Please select some text to explain.');
-    return;
+  // --- Explain Tool ---
+  const explainBtn = document.createElement('button');
+  explainBtn.innerHTML = `<i class="fas fa-magic"></i>`;
+  explainBtn.title = 'Explain Selected Text';
+  Object.assign(explainBtn.style, {
+    width: '32px',
+    height: '32px',
+    fontSize: '16px',
+    cursor: 'pointer',
+    borderRadius: '6px',
+    border: '1px solid #aaa',
+    backgroundColor: '#fff'
+  });
 
-  }
-  
-explainBtn.disabled = true;
-explainBtn.innerHTML = `<i class="fa fa-magic fa-spin"></i> Explaining...`;
-  try {
-    const response = await fetch('http://localhost:3000/explain', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: "Explain this: " + selectedText })
-    });
-
-    const data = await response.json();
-    const explanation = data.summary || 'No explanation returned.';
-
-    // Show explanation in a sticky note
-  showGlasspenPopup(explanation, 'Explanation');
-
-  } catch (err) {
-    console.error('Error explaining:', err);
-    alert('Something went wrong while explaining.');
-  }finally {
-    // Remove loading state
-    explainBtn.disabled = false;
-    explainBtn.innerHTML = `<i class="fas fa-magic"></i>`;
-  }
-});
-
-toolbar.appendChild(explainBtn);
+  explainBtn.addEventListener('click', async () => {
+    const selectedText = window.getSelection().toString().trim();
+    if (!selectedText) {
+      alert('Please select some text to explain.');
+      return;
+    }
+    explainBtn.disabled = true;
+    explainBtn.innerHTML = `<i class="fa fa-magic fa-spin"></i> Explaining...`;
+    try {
+      const response = await fetch('http://localhost:3000/explain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: "Explain this: " + selectedText })
+      });
+      const data = await response.json();
+      const explanation = data.summary || 'No explanation returned.';
+      showGlasspenPopup(explanation, 'Explanation');
+    } catch (err) {
+      console.error('Error explaining:', err);
+      alert('Something went wrong while explaining.');
+    } finally {
+      explainBtn.disabled = false;
+      explainBtn.innerHTML = `<i class="fas fa-magic"></i>`;
+    }
+  });
+  toolbar.appendChild(explainBtn);
 
   // --- Other Toolbar Buttons ---
   createIconButton('<i class="fas fa-undo"></i>', () => {
@@ -646,39 +686,35 @@ toolbar.appendChild(explainBtn);
     if (!noteDropdown.contains(e.target)) noteColorOptions.style.display = 'none';
   });
 
-  // --- Window resize handler ---
-  function handleResize() {
-    const oldWidth = canvas.width;
-    const oldHeight = canvas.height;
-    const newWidth = window.innerWidth;
-    const newHeight = window.innerHeight;
-    const scaleX = newWidth / oldWidth;
-    const scaleY = newHeight / oldHeight;
-    canvas.width = newWidth;
-    canvas.height = newHeight;
-    canvas.style.width = `${newWidth}px`;
-    canvas.style.height = `${newHeight}px`;
-    paths = paths.map(path => ({
-      ...path,
-      points: path.points.map(point => ({
-        x: point.x * scaleX,
-        y: point.y * scaleY
-      }))
-    }));
-    document.querySelectorAll('.glasspen-note').forEach(note => {
-      const left = parseFloat(note.style.left);
-      const top = parseFloat(note.style.top);
-      note.style.left = (left * scaleX) + 'px';
-      note.style.top = (top * scaleY) + 'px';
-    });
-    redraw();
-    saveNotes();
+  // --- Window resize/scroll/DOM change handler ---
+  function updateCanvasSize() {
+    const newWidth = document.documentElement.scrollWidth;
+    const newHeight = document.documentElement.scrollHeight;
+    if (canvas.width !== newWidth || canvas.height !== newHeight) {
+      // Scale paths to new size
+      const scaleX = newWidth / canvas.width;
+      const scaleY = newHeight / canvas.height;
+      paths = paths.map(path => ({
+        ...path,
+        points: path.points.map(point => ({
+          x: point.x * scaleX,
+          y: point.y * scaleY
+        }))
+      }));
+      canvas.width = newWidth;
+      canvas.height = newHeight;
+      canvas.style.width = `${newWidth}px`;
+      canvas.style.height = `${newHeight}px`;
+      redraw();
+    }
   }
   let resizeTimeout;
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimeout);
-    resizeTimeout = setTimeout(handleResize, 150);
+    resizeTimeout = setTimeout(updateCanvasSize, 150);
   });
+  window.addEventListener('scroll', updateCanvasSize);
+  new MutationObserver(updateCanvasSize).observe(document.body, { childList: true, subtree: true });
 
   redraw();
   loadNotes();
