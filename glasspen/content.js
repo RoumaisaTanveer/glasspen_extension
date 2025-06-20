@@ -683,7 +683,3 @@ toolbar.appendChild(explainBtn);
   redraw();
   loadNotes();
 });
-// Automatically activate and restore drawing/notes if data exists in localStorage
-if (localStorage.getItem('glasspen_paths') || localStorage.getItem('glasspen_notes')) {
-  document.dispatchEvent(new Event('glasspen-activate'));
-}
