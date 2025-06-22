@@ -394,47 +394,39 @@ document.addEventListener('glasspen-activate', () => {
     return btn;
   }
 
-  // --- CLEAR DRAW TOGGLE BUTTON ---
+  // --- DRAW TOGGLE BUTTON ---
   let drawingEnabled = true;
   const drawToggleBtn = document.createElement('button');
-  // Use a toggle switch icon and clear label
-  drawToggleBtn.innerHTML = `<span id="draw-toggle-label" style="font-weight:bold;">Disable Drawing</span>`;
-  drawToggleBtn.title = 'Enable or Disable Drawing Mode';
+  drawToggleBtn.innerHTML = '<i class="fas fa-pen"></i>';
+  drawToggleBtn.title = 'Toggle Drawing Mode';
   Object.assign(drawToggleBtn.style, {
+    width: '32px',
     height: '32px',
-    padding: '0 16px',
-    fontSize: '15px',
+    fontSize: '16px',
     cursor: 'pointer',
     borderRadius: '6px',
     border: '1px solid #aaa',
-    backgroundColor: '#4caf50', // green for ON
-    color: '#fff',
-    fontWeight: 'bold'
+    backgroundColor: '#ddd'
   });
   toolbar.appendChild(drawToggleBtn);
 
   function updateDrawingMode() {
-    const label = drawToggleBtn.querySelector('#draw-toggle-label');
     if (drawingEnabled) {
       canvas.style.pointerEvents = 'auto';
       canvas.style.cursor = 'crosshair';
-      drawToggleBtn.style.backgroundColor = '#4caf50'; // green
-      label.textContent = 'Disable';
+      drawToggleBtn.style.backgroundColor = '#ddd';
+      enableCanvasEvents();
     } else {
       canvas.style.pointerEvents = 'none';
       canvas.style.cursor = 'default';
-      drawToggleBtn.style.backgroundColor = '#aaa'; // gray
-      label.textContent = 'Enable';
+      drawToggleBtn.style.backgroundColor = '#fff';
+      disableCanvasEvents();
     }
-    drawToggleBtn.style.color = '#fff';
   }
   drawToggleBtn.onclick = () => {
     drawingEnabled = !drawingEnabled;
-    if (drawingEnabled) enableCanvasEvents();
-    else disableCanvasEvents();
     updateDrawingMode();
   };
-  enableCanvasEvents();
   updateDrawingMode();
 
   // --- Pen Tool ---
