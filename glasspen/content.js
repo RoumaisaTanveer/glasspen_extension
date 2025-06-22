@@ -395,39 +395,89 @@ document.addEventListener('glasspen-activate', () => {
   }
 
   // --- DRAW TOGGLE BUTTON ---
-  let drawingEnabled = true;
-  const drawToggleBtn = document.createElement('button');
-  drawToggleBtn.innerHTML = '<i class="fas fa-pen"></i>';
-  drawToggleBtn.title = 'Toggle Drawing Mode';
-  Object.assign(drawToggleBtn.style, {
-    width: '32px',
-    height: '32px',
-    fontSize: '16px',
-    cursor: 'pointer',
-    borderRadius: '6px',
-    border: '1px solid #aaa',
-    backgroundColor: '#ddd'
-  });
-  toolbar.appendChild(drawToggleBtn);
+// --- DRAW TOGGLE BUTTON (chrome://extensions/ style) ---
+let drawingEnabled = true;
 
-  function updateDrawingMode() {
-    if (drawingEnabled) {
-      canvas.style.pointerEvents = 'auto';
-      canvas.style.cursor = 'crosshair';
-      drawToggleBtn.style.backgroundColor = '#ddd';
-      enableCanvasEvents();
-    } else {
-      canvas.style.pointerEvents = 'none';
-      canvas.style.cursor = 'default';
-      drawToggleBtn.style.backgroundColor = '#fff';
-      disableCanvasEvents();
-    }
+// Toggle container
+const toggleContainer = document.createElement('div');
+toggleContainer.style.display = 'flex';
+toggleContainer.style.alignItems = 'center';
+toggleContainer.style.gap = '6px';
+
+// Label
+const toggleLabel = document.createElement('span');
+toggleLabel.textContent = '';
+toggleLabel.style.fontSize = '14px';
+toggleLabel.style.fontFamily = 'sans-serif';
+toggleLabel.style.userSelect = 'none';
+toggleContainer.appendChild(toggleLabel);
+
+// Toggle switch
+const toggleSwitch = document.createElement('label');
+toggleSwitch.style.position = 'relative';
+toggleSwitch.style.display = 'inline-block';
+toggleSwitch.style.width = '44px';
+toggleSwitch.style.height = '24px';
+toggleSwitch.style.cursor = 'pointer';
+
+const toggleInput = document.createElement('input');
+toggleInput.type = 'checkbox';
+toggleInput.checked = drawingEnabled;
+toggleInput.style.opacity = '0';
+toggleInput.style.width = '0';
+toggleInput.style.height = '0';
+
+const slider = document.createElement('span');
+slider.style.position = 'absolute';
+slider.style.top = '0';
+slider.style.left = '0';
+slider.style.right = '0';
+slider.style.bottom = '0';
+slider.style.background = drawingEnabled ? '#4285f4' : '#ccc';
+slider.style.borderRadius = '24px';
+slider.style.transition = 'background 0.2s';
+slider.style.boxShadow = '0 1px 4px rgba(0,0,0,0.10) inset';
+
+// The circle
+const sliderCircle = document.createElement('span');
+sliderCircle.style.position = 'absolute';
+sliderCircle.style.height = '20px';
+sliderCircle.style.width = '20px';
+sliderCircle.style.left = drawingEnabled ? '22px' : '2px';
+sliderCircle.style.top = '2px';
+sliderCircle.style.background = '#fff';
+sliderCircle.style.borderRadius = '50%';
+sliderCircle.style.transition = 'left 0.2s';
+sliderCircle.style.boxShadow = '0 1px 4px rgba(0,0,0,0.12)';
+
+slider.appendChild(sliderCircle);
+toggleSwitch.appendChild(toggleInput);
+toggleSwitch.appendChild(slider);
+toggleContainer.appendChild(toggleSwitch);
+toolbar.appendChild(toggleContainer);
+
+function updateDrawingMode() {
+  if (drawingEnabled) {
+    canvas.style.pointerEvents = 'auto';
+    canvas.style.cursor = 'crosshair';
+    slider.style.background = '#4285f4';
+    sliderCircle.style.left = '22px';
+    enableCanvasEvents();
+  } else {
+    canvas.style.pointerEvents = 'none';
+    canvas.style.cursor = 'default';
+    slider.style.background = '#ccc';
+    sliderCircle.style.left = '2px';
+    disableCanvasEvents();
   }
-  drawToggleBtn.onclick = () => {
-    drawingEnabled = !drawingEnabled;
-    updateDrawingMode();
-  };
+}
+
+toggleInput.onchange = () => {
+  drawingEnabled = toggleInput.checked;
   updateDrawingMode();
+};
+updateDrawingMode();
+
 
   // --- Pen Tool ---
   const penDropdown = document.createElement('div');
