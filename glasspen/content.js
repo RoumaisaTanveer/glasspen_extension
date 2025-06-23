@@ -7,8 +7,10 @@ document.addEventListener('glasspen-activate', () => {
   fa.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css';
   document.head.appendChild(fa);
 
-  const STORAGE_KEY = 'glasspen_paths';
-  const NOTES_KEY = 'glasspen_notes';
+ const PAGE_ID = location.pathname + location.search; // or use location.href for full uniqueness
+const STORAGE_KEY = 'glasspen_paths_' + PAGE_ID;
+const NOTES_KEY = 'glasspen_notes_' + PAGE_ID;
+
 
   function savePaths() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(paths));
@@ -20,6 +22,8 @@ document.addEventListener('glasspen-activate', () => {
     }
     return [];
   }
+
+  
   function clearSavedPaths() {
     localStorage.removeItem(STORAGE_KEY);
   }
@@ -73,83 +77,127 @@ document.addEventListener('glasspen-activate', () => {
   let currentHighlightThickness = 22;
   let currentNoteColor = '#ffff88';
 
-  // --- Sticky Notes ---
-  function createStickyNote(top, left, text = '', color = currentNoteColor) {
-    if (!top || !left) {
-      const noteWidth = 200, noteHeight = 150, padding = 40;
-      const maxLeft = window.innerWidth - noteWidth - padding;
-      const maxTop = window.innerHeight - noteHeight - padding;
-      left = Math.floor(Math.random() * maxLeft) + padding + 'px';
-      top = Math.floor(Math.random() * maxTop) + padding + 'px';
-    }
-    const note = document.createElement('div');
-    note.className = 'glasspen-note';
-    Object.assign(note.style, {
-      position: 'fixed',
-      top,
-      left,
-      width: '200px',
-      height: '150px',
-      backgroundColor: color,
-      border: '1px solid #000',
-      padding: '5px',
-      zIndex: '1000002',
-      resize: 'both',
-      overflow: 'auto',
-      boxShadow: '2px 2px 6px rgba(0,0,0,0.2)',
-      cursor: 'grab'
-    });
-    let offsetX, offsetY, dragging = false;
-
-    note.addEventListener('mousedown', function (e) {
-      if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON') return;
-      dragging = true;
-      note.style.cursor = 'grabbing';
-      offsetX = e.clientX - note.offsetLeft;
-      offsetY = e.clientY - note.offsetTop;
-      function move(e) {
-        if (!dragging) return;
-        note.style.left = e.clientX - offsetX + 'px';
-        note.style.top = e.clientY - offsetY + 'px';
-      }
-      function stopMove() {
-        dragging = false;
-        note.style.cursor = 'grab';
-        document.removeEventListener('mousemove', move);
-        document.removeEventListener('mouseup', stopMove);
-        saveNotes();
-      }
-      document.addEventListener('mousemove', move);
-      document.addEventListener('mouseup', stopMove);
-    });
-    const textarea = document.createElement('textarea');
-    textarea.style.width = '100%';
-    textarea.style.height = 'calc(100% - 25px)';
-    textarea.style.border = 'none';
-    textarea.style.outline = 'none';
-    textarea.style.background = 'transparent';
-    textarea.style.resize = 'none';
-    textarea.value = text;
-    textarea.oninput = saveNotes;
-    const delBtn = document.createElement('button');
-    delBtn.innerHTML = '<i class="fas fa-times"></i>';
-    Object.assign(delBtn.style, {
-      position: 'absolute',
-      top: '2px',
-      right: '4px',
-      background: 'transparent',
-      border: 'none',
-      fontSize: '16px',
-      cursor: 'pointer'
-    });
-    delBtn.onclick = () => {
-      note.remove();
-      saveNotes();
-    };
-    note.appendChild(delBtn);
-    note.appendChild(textarea);
-    document.body.appendChild(note);
+function createStickyNote(top, left, text = '', color = currentNoteColor) {
+  if (!top || !left) {
+    const noteWidth = 220, noteHeight = 160, padding = 40;
+    const maxLeft = window.innerWidth - noteWidth - padding;
+    const maxTop = window.innerHeight - noteHeight - padding;
+    left = Math.floor(Math.random() * maxLeft) + padding + 'px';
+    top = Math.floor(Math.random() * maxTop) + padding + 'px';
   }
+
+  const note = document.createElement('div');
+  note.className = 'glasspen-note';
+  Object.assign(note.style, {
+    position: 'fixed',
+    top,
+    left,
+    width: '220px',
+    height: '160px',
+    backgroundColor: color,
+    borderRadius: '12px',
+    border: '1px solid #ccc',
+    padding: '10px',
+    zIndex: '1000002',
+    resize: 'both',
+    overflow: 'hidden',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    fontFamily: 'Segoe UI, sans-serif',
+    fontSize: '14px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    position: 'fixed',
+    transition: 'box-shadow 0.2s ease',
+  });
+  
+  
+  // --- Dragging ---
+  let offsetX, offsetY, dragging = false;
+  note.addEventListener('mousedown', function (e) {
+    if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON') return;
+    dragging = true;
+    note.style.cursor = 'grabbing';
+    offsetX = e.clientX - note.offsetLeft;
+    offsetY = e.clientY - note.offsetTop;
+
+    function move(e) {
+      if (!dragging) return;
+      note.style.left = e.clientX - offsetX + 'px';
+      note.style.top = e.clientY - offsetY + 'px';
+    }
+
+    function stopMove() {
+      dragging = false;
+      note.style.cursor = 'grab';
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', stopMove);
+      saveNotes();
+    }
+
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', stopMove);
+  });
+
+  // --- Header with Buttons ---
+  const header = document.createElement('div');
+  Object.assign(header.style, {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  });
+
+  const btnStyle = {
+    background: 'transparent',
+    border: 'none',
+    fontSize: '14px',
+    cursor: 'pointer',
+    color: '#555'
+  };
+
+  const closeBtn = document.createElement('button');
+  closeBtn.innerHTML = '<i class="fa fa-eye-slash"></i>';
+  Object.assign(closeBtn.style, btnStyle);
+  closeBtn.title = 'Hide note';
+  closeBtn.onclick = () => {
+    note.style.display = 'none';
+  };
+
+  const delBtn = document.createElement('button');
+  delBtn.innerHTML = '<i class="fa fa-trash"></i>';
+  Object.assign(delBtn.style, btnStyle);
+  delBtn.title = 'Delete note';
+  delBtn.onclick = () => {
+    note.remove();
+    saveNotes();
+  };
+
+  header.appendChild(closeBtn);
+  header.appendChild(delBtn);
+
+  // --- Text Area ---
+  const textarea = document.createElement('textarea');
+  Object.assign(textarea.style, {
+    flex: '1',
+    width: '100%',
+    height: '100%',
+    border: 'none',
+    outline: 'none',
+    background: 'transparent',
+    resize: 'none',
+    fontSize: '14px',
+    fontFamily: 'inherit',
+  });
+  textarea.value = text;
+  textarea.addEventListener('input', () => {
+    clearTimeout(note._timeout);
+    note._timeout = setTimeout(saveNotes, 500);
+  });
+
+  note.appendChild(header);
+  note.appendChild(textarea);
+  document.body.appendChild(note);
+}
 
   function showGlasspenPopup(text, label = 'AI Response') {
     const popup = document.createElement('div');
@@ -613,6 +661,7 @@ updateDrawingMode();
     penOptions.style.display = 'none';
     highlightOptions.style.display = 'none';
   });
+// Example icon HTML for Notes List (you can replace with any SVG or icon)
 
   // --- Summarize Tool ---
   const summarizeBtn = document.createElement('button');
