@@ -744,6 +744,198 @@ updateDrawingMode();
     }
   });
   toolbar.appendChild(explainBtn);
+  // --- Create container div to hold textarea ---
+// --- Constants ---
+const TEXTBOXES_STORAGE_KEY = STORAGE_KEY + '_transparent_textboxes'; // STORAGE_KEY should be defined in your code
+
+// --- Container for all text boxes ---
+const textBoxesParent = document.createElement('div');
+document.body.appendChild(textBoxesParent);
+
+// --- Load saved text boxes data ---
+let textBoxesData = JSON.parse(localStorage.getItem(TEXTBOXES_STORAGE_KEY)) || [];
+
+// --- Function to save all text boxes data ---
+function saveAllTextBoxes() {
+  const data = [];
+  textBoxesParent.childNodes.forEach(container => {
+    const textarea = container.querySelector('textarea');
+    data.push({
+      id: container._id,
+      content: textarea.value,
+      left: container.style.left,
+      top: container.style.top,
+      width: container.style.width,
+      height: container.style.height,
+    });
+  });
+  localStorage.setItem(TEXTBOXES_STORAGE_KEY, JSON.stringify(data));
+}
+
+// --- Function to create a new text box ---
+function createTextBox(id, content = '', left = 100, top = 100, width = '320px', height = '220px') {
+  const container = document.createElement('div');
+  Object.assign(container.style, {
+    position: 'absolute',
+    top: top,
+    left: left,
+    width: width,
+    height: height,
+    maxWidth: '80vw',
+    maxHeight: '60vh',
+    zIndex: 1000000,
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    borderRadius: '8px',
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    overflow: 'auto',
+    fontFamily: 'Arial, sans-serif',
+    resize: 'both',
+    boxSizing: 'border-box',
+    padding: '12px',
+    cursor: 'grab',
+    userSelect: 'none',
+  });
+
+  const textarea = document.createElement('textarea');
+  Object.assign(textarea.style, {
+    width: '100%',
+    height: '100%',
+    border: 'none',
+    outline: 'none',
+    resize: 'none',
+    padding: '8px',
+    fontSize: '16px',
+    boxSizing: 'border-box',
+    color: '#000',
+    backgroundColor: 'transparent',
+    fontFamily: 'inherit',
+    userSelect: 'text',
+    cursor: 'text',
+    overflowY: 'auto',
+    overflowX: 'hidden',
+  });
+  textarea.value = content;
+  container.appendChild(textarea);
+  textBoxesParent.appendChild(container);
+
+  container._id = id;
+
+  // --- Dragging logic ---
+  let isDragging = false;
+  let dragOffsetX = 0;
+  let dragOffsetY = 0;
+
+  function isOnResizeHandle(e) {
+    const rect = container.getBoundingClientRect();
+    const resizeHandleSize = 16; // px from bottom-right corner
+    return (
+      e.clientX >= rect.right - resizeHandleSize &&
+      e.clientY >= rect.bottom - resizeHandleSize
+    );
+  }
+
+  container.addEventListener('mousedown', e => {
+    if (e.target === textarea) return; // Don't drag if clicking textarea
+    if (isOnResizeHandle(e)) return;   // Don't drag if clicking resize handle
+
+    isDragging = true;
+    const rect = container.getBoundingClientRect();
+    dragOffsetX = e.clientX - rect.left;
+    dragOffsetY = e.clientY - rect.top;
+    container.style.cursor = 'grabbing';
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!isDragging) return;
+    let newLeft = e.clientX - dragOffsetX + window.pageXOffset;
+    let newTop = e.clientY - dragOffsetY + window.pageYOffset;
+    newLeft = Math.max(newLeft, 0);
+    newTop = Math.max(newTop, 0);
+    container.style.left = newLeft + 'px';
+    container.style.top = newTop + 'px';
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (isDragging) {
+      isDragging = false;
+      container.style.cursor = 'grab';
+      saveAllTextBoxes();
+    }
+  });
+
+  // Save content on input
+  textarea.addEventListener('input', () => {
+    saveAllTextBoxes();
+  });
+
+  // Save size on container resize (using ResizeObserver)
+  const resizeObserver = new ResizeObserver(() => {
+    saveAllTextBoxes();
+  });
+  resizeObserver.observe(container);
+
+  return { container, textarea };
+}
+
+// --- Load all saved text boxes ---
+function loadAllTextBoxes() {
+  textBoxesData.forEach(box => {
+    createTextBox(
+      box.id,
+      box.content,
+      box.left,
+      box.top,
+      box.width,
+      box.height
+    );
+  });
+}
+
+// --- Add button to toolbar ---
+const addTextBoxBtn = document.createElement('button');
+addTextBoxBtn.textContent = 'T';
+Object.assign(addTextBoxBtn.style, {
+  height: '32px',
+  width: '32px',
+  fontSize: '20px',
+  fontWeight: 'bold',
+  cursor: 'pointer',
+  borderRadius: '6px',
+  border: '1px solid #aaa',
+  backgroundColor: '#f9f9f9',
+  padding: '0',
+  fontFamily: 'sans-serif',
+  userSelect: 'none',
+  marginLeft: '4px',
+  textAlign: 'center',
+  lineHeight: '32px',
+});
+addTextBoxBtn.title = 'Add Text Box';
+toolbar.appendChild(addTextBoxBtn);
+
+addTextBoxBtn.onclick = () => {
+  const id = 'tb_' + Date.now();
+  let left = '100px';
+  let top = '100px';
+
+  const selection = window.getSelection();
+  if (selection.rangeCount > 0) {
+    const range = selection.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+    left = (rect.left + scrollLeft) + 'px';
+    top = (rect.top + scrollTop + rect.height + 5) + 'px';
+  }
+
+  createTextBox(id, '', left, top);
+  saveAllTextBoxes();
+};
+
+// Initialize on load
+loadAllTextBoxes();
+
 
   // --- Other Toolbar Buttons ---
   createIconButton('<i class="fas fa-undo"></i>', () => {
@@ -758,13 +950,20 @@ updateDrawingMode();
     noteColorOptions.style.display = 'none';
     redraw();
   });
-  createIconButton('<i class="fas fa-trash"></i>', () => {
-    paths.length = 0;
-    clearSavedPaths();
-    redraw();
-    document.querySelectorAll('.glasspen-note').forEach(note => note.remove());
-    localStorage.removeItem(NOTES_KEY);
-  });
+ createIconButton('<i class="fas fa-trash"></i>', () => {
+  paths.length = 0;
+  clearSavedPaths();
+  redraw();
+
+  // Remove all notes
+  document.querySelectorAll('.glasspen-note').forEach(note => note.remove());
+  localStorage.removeItem(NOTES_KEY);
+
+  // Remove all text boxes
+  textBoxesParent.innerHTML = '';
+  localStorage.removeItem(TEXTBOXES_STORAGE_KEY);
+});
+
   createIconButton('<i class="fas fa-times"></i>', () => {
     [canvas, toolbar, noteDropdown].forEach(el => el && el.remove());
     document.querySelectorAll('.glasspen-note').forEach(n => n.remove());
@@ -776,6 +975,9 @@ updateDrawingMode();
     if (!highlightDropdown.contains(e.target)) highlightOptions.style.display = 'none';
     if (!noteDropdown.contains(e.target)) noteColorOptions.style.display = 'none';
   });
+// --- Create container div to hold textarea ---
+
+
 
   // --- Window resize/scroll/DOM change handler ---
   function updateCanvasSize() {
