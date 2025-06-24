@@ -1,1 +1,0 @@
-console.log("GlassPen background running...");
