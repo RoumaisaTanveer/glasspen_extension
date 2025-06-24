@@ -48,9 +48,7 @@ https://github.com/user-attachments/assets/4b3e379c-dcca-46ed-8094-6bb68b920199
 
 
 ---
-
-
-
+ ❗ This repository contains only the frontend. The backend is abstracted and maintained separately in a private/internal repository for now.
 ## 🔖 Tags
 
 #glasspen #chromeextension #ai #machinelearning #productivity #developers #learningtools
