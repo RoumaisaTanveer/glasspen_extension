@@ -1,4 +1,4 @@
-# GlassPen ✍️  A Chrome Extension with Built-in AI
+# GlassPen : A Chrome Extension with Built-in AI
 
 I was reading a machine learning article and found it tough to follow.
 
